@@ -10,6 +10,11 @@ real code paths, identify concrete risks, rank findings by severity and confiden
 remediation directions that can guide later refactoring, security hardening, bug fixing, or
 test improvement.
 
+For broader architecture and maintainability reviews, the skill can also use read-only
+subagents as structure scouts. The main reviewer still performs its own investigation, then
+compares the scout maps against the primary map to judge whether the codebase is easy to
+understand, add features to, remove features from, and safely refactor.
+
 ## What It Reviews
 
 - Correctness, behavior, and edge cases
@@ -21,6 +26,7 @@ test improvement.
 - Security boundaries, untrusted input flows, sensitive sinks, and dependency risk
 - Reliability, performance, operations, and diagnostics
 - Test quality, mock boundaries, observability, and regression coverage
+- Structure legibility for feature additions, feature removals, and shared contract changes
 
 ## Domain Coverage
 
@@ -48,6 +54,11 @@ The skill keeps review work separate from implementation work:
 
 When supported by the host, the skill can also emit inline comments for findings tied to
 specific files and line ranges.
+
+For broad architecture or maintainability reviews, the skill may ask subagents to map entry
+points, major owners, dependency direction, and likely feature-change paths. Conflicting or
+incomplete maps are treated as maintainability signals only after the main reviewer verifies
+the underlying code path.
 
 ## Installation
 

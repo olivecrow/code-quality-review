@@ -1,6 +1,6 @@
 ---
 name: code-quality-review
-description: Read-only, evidence-backed code quality review for repositories, pull requests, diffs, modules, files, web services, frontend/mobile/desktop apps, Unity or game projects, libraries, CLIs, and data or automation code. Use when Codex is asked to review code quality, correctness, architecture, refactoring risks, code smells, module and layer boundaries, dependency structure, shared helper/type/schema reuse, hidden coupling, error handling, test strategy, reliability, performance, security, or technical debt, especially when findings and recommendations should come before implementation.
+description: Read-only, evidence-backed code quality review for repositories, pull requests, diffs, modules, files, web services, frontend/mobile/desktop apps, Unity or game projects, libraries, CLIs, and data or automation code. Use when Codex is asked to review code quality, correctness, architecture, refactoring risks, code smells, module and layer boundaries, dependency structure, shared helper/type/schema reuse, hidden coupling, error handling, test strategy, reliability, performance, security, technical debt, or whether the structure is understandable and maintainable enough for feature additions/removals. For broad architecture or maintainability reviews, use subagents as read-only structure scouts when the host supports them, then synthesize their maps with the main reviewer's own investigation.
 ---
 
 # Code Quality Review
@@ -29,6 +29,7 @@ Prefer findings over broad advice. A useful review identifies the affected code,
    - Identify owners for shared functions, helpers, types, schemas, DTOs, validation shapes, constants, adapters, protocol objects, events, and assets. Treat repeated reinvention of these artifacts as a first-class refactoring signal.
    - Sketch dependency direction in words: which layers are allowed to depend on which other layers, where cross-layer shortcuts appear, and whether directory hierarchy makes ownership visible.
    - Separate actual behavior visible in code from inferred design intent.
+   - When the scope is broad and the host supports subagents, run a bounded read-only structure pass as described in `Subagent-Assisted Structure Review`. Do this in addition to the main reviewer's own mapping, not instead of it.
 
 3. Follow real paths.
    - Trace code from public inputs to meaningful outputs, side effects, storage, rendering, network calls, engine callbacks, process boundaries, or security-sensitive sinks.
@@ -58,6 +59,39 @@ Actively look for these review signals, then explain them through the relevant r
 - Ownership fog: flat hierarchy, broad `shared` folders, re-export chains, wildcard exports, or asset folders hide ownership and dependency direction.
 - Silent failure: empty catch blocks, broad fallbacks, valid-looking defaults, catch-and-continue behavior, or repeated caller-side defensive checks hide defects and inflate code size.
 
+## Subagent-Assisted Structure Review
+
+Use this pass for repository-level, module-level, architecture, refactoring, or maintainability reviews when subagents are available. Skip it for narrow diffs, tiny files, urgent reviews, privacy-sensitive code that should not be delegated, or hosts where subagents are unavailable.
+
+The main reviewer must still inspect the code directly, verify important claims, and own the final findings. Subagents provide an independent readability check: if a well-structured codebase exposes clear entry points, ownership, dependency direction, and feature-change paths, a bounded read-only scout should be able to describe that structure from the files and tests without hidden context.
+
+### How to Delegate
+
+- Spawn one or two read-only explorer subagents with narrow scopes. Use one scout for the core structure map. Add a second only when the review is large enough to justify a separate understandability and changeability pass, or when there is a distinct concern such as tests, security boundaries, Unity lifecycle, frontend state flow, or data pipeline ownership.
+- Propagate active operating constraints and relevant skills. Require read-only inspection, no file edits, no staging, no commits, no dependency installation, no external mutation, and no production access.
+- Ask the structure scout to return a compact map, not a general review. Request:
+  - entry points and runtime lifecycle;
+  - major modules, layers, ownership boundaries, and dependency direction;
+  - exact files or symbols that support the map;
+  - confidence and open questions.
+- Ask the changeability scout, when used, to judge:
+  - how easy it is to locate the code for a representative behavior;
+  - the path a developer would follow to add a typical feature, remove a feature, replace an integration, or change a shared contract;
+  - whether those edits stay inside clear ownership boundaries;
+  - which tests or validation checks should cover the change;
+  - places where structure is easy to infer, hard to infer, or contradicted by imports/tests;
+  - exact files or symbols that support the map;
+  - confidence and open questions.
+- Do not leak intended findings or suspected conclusions into the scout prompt. The scout should reconstruct the structure from source evidence.
+
+### How to Synthesize
+
+- Compare scout maps against the main reviewer's own map. Treat subagent maps as leads, not conclusions; confirm important claims through direct file reads, imports, tests, manifests, or dependency evidence before reporting them.
+- Treat disagreement, missing owners, contradictory maps, or inability to identify a feature-change path as maintainability signals. Verify the underlying code path before turning the signal into a finding.
+- Distinguish structure problems from context problems. If a scout fails because the prompt scope was too broad, files were unavailable, generated code dominated the view, or project-specific conventions were not loaded, fix the review setup before blaming the codebase.
+- Do not outsource final severity, security conclusions, or remediation decisions. The main reviewer owns the final findings and must cite inspected code.
+- Report the subagent pass only when it materially affects the review. Summarize the useful map, disagreements, and maintainability implications; omit process noise.
+
 ## Review Lenses
 
 ### Correctness and Behavior
@@ -71,6 +105,7 @@ Actively look for these review signals, then explain them through the relevant r
 - Check module, package, component, scene, asset, and layer boundaries against the project structure and actual imports.
 - Use SOLID only as a diagnostic lens, not as a slogan. Flag Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, or Dependency Inversion issues only when they create concrete maintenance, testing, correctness, or extension cost.
 - Flag oversized modules, God classes, God objects, broad service objects, overgrown components, and orchestration code that centralizes unrelated product logic, state, persistence, validation, integration, or lifecycle behavior.
+- Check structure legibility and change paths: a reviewer should be able to identify where a feature starts, where it is validated, where state is owned, where side effects happen, what must be removed to delete a feature, and whether feature addition or removal stays inside clear ownership boundaries.
 - Prefer existing project patterns and local ownership over generic architecture advice.
 
 ### Dependencies and Boundaries
@@ -151,6 +186,7 @@ Use this checklist when the review is meant to guide later implementation:
 - Change discipline: new functions, helpers, schemas, adapters, and assets are created only after searching for existing owners; errors are handled at boundaries; fallback behavior is explicit.
 - Review discipline: duplicate replacements, dead code, commented-out code, hidden coupling, re-export fog, fan-in/fan-out hotspots, and initialization-order dependencies are checked before recommending changes.
 - Test discipline: edge cases are listed before implementation; tests assert behavior and side effects; mocks stay at external boundaries; tests do not force production-only defensive clutter.
+- Structure legibility: an independent read-only scout can identify entry points, major owners, dependency direction, and the expected files for adding, removing, or changing a representative feature.
 
 If a repository lacks enforcement, recommend incremental guardrails in this order: detect circular imports or dependency cycles, enforce layer import rules, enable strict typing or typed boundary validation, then add complexity/depth/function-size limits. Avoid proposing a large rule set that would bury the team in unrelated violations; scope rules to changed or high-risk areas when needed.
 
@@ -160,7 +196,7 @@ Each actionable finding should include:
 
 - Severity: `Critical`, `High`, `Medium`, `Low`, or `Info`.
 - Confidence: `High`, `Medium`, or `Low`.
-- Category: for example `Security`, `Correctness`, `Architecture`, `Dependency`, `Code smell`, `Testing`, `Performance`, `Reliability`, or `Operations`.
+- Category: for example `Security`, `Correctness`, `Architecture`, `Structure legibility`, `Dependency`, `Code smell`, `Testing`, `Performance`, `Reliability`, or `Operations`.
 - Evidence: exact file and line references where possible.
 - Impact: the concrete bug, risk, maintenance cost, or refactoring blocker.
 - Direction: the smallest practical refactoring, fix, boundary change, or test strategy that would address it later.
@@ -199,6 +235,7 @@ Recommended structure:
 **Refactoring Map**
 - Quick wins: duplicate helpers/schemas to remove, dead code, shallow nesting cleanup, narrow re-export cleanup, local tests to rewrite.
 - Structural refactors: boundary, layering, ownership, directory hierarchy, dependency direction, fan-in/fan-out, lifecycle, initialization-order, or asset ownership changes.
+- Architecture clarity: whether the structure is easy to understand and maintain, including entry points, owners, dependency direction, feature addition/removal paths, confusing ownership, and the smallest boundary improvements.
 - Enforcement: lint, type, dependency, complexity, package, assembly, and CI rules that should prevent recurrence.
 - Security hardening: confirmed vulnerabilities and defense-in-depth items.
 - Test coverage: edge-case, behavior, side-effect, failure-path, lifecycle, and integration tests that should exist before or during changes.
